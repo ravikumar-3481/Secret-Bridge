@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Brand Gradient: Orange to Amber -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" /> <!-- Tailwind orange-500 -->
+      <stop offset="100%" stop-color="#f59e0b" /> <!-- Tailwind amber-500 -->
+    </linearGradient>
+    
+    <!-- Soft shadow for depth -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#c2410c" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Background App-Icon Shape (Squircle) -->
+  <rect width="512" height="512" rx="128" fill="url(#brandGrad)" />
+
+  <!-- Shield Shape (White) -->
+  <path filter="url(#shadow)" d="M256 104C256 104 153.3 133.5 136 140.7C128.8 143.7 124 150.8 124 158.5V265.5C124 359.1 242.6 427 249.6 430.8C253.6 433 258.4 433 262.4 430.8C269.4 427 388 359.1 388 265.5V158.5C388 150.8 383.2 143.7 376 140.7C358.7 133.5 256 104 256 104Z" fill="#ffffff" />
+
+  <!-- Keyhole (Inner Cutout mimicking the background gradient) -->
+  <circle cx="256" cy="224" r="32" fill="url(#brandGrad)" />
+  <path d="M244 248 L230 332C229 339 234 344 240 344H272C278 344 283 339 282 332L268 248Z" fill="url(#brandGrad)" />
+</svg>
