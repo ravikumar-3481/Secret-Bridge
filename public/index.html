@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecretBridge - Encrypted File Sharing</title>
+    <title>SecretBridge V2.5 - Secure File Sharing</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,8 +11,8 @@
     <!-- Iconify -->
     <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
 
-    <!-- CryptoJS for Client-Side AES E2EE -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- QRCode.js for generating shareable QR codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -21,6 +21,9 @@
                     fontFamily: {
                         sans: ['Inter', 'system-ui', 'sans-serif'],
                         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+                    },
+                    colors: {
+                        brand: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' }
                     },
                     keyframes: {
                         shimmer: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(100%)' } }
@@ -31,190 +34,379 @@
         }
     </script>
     <style>
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
-        .slide-in-left { animation: slideInLeft 0.5s ease-out forwards; }
-        .slide-in-right { animation: slideInRight 0.5s ease-out forwards; }
-        .zoom-in-95 { animation: zoomIn95 0.5s cubic-bezier(0.23,1,0.32,1) forwards; }
-        .zoom-in-50 { animation: zoomIn50 0.5s cubic-bezier(0.23,1,0.32,1) forwards; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .slide-in-left { animation: slideInLeft 0.4s ease-out forwards; }
+        .slide-in-right { animation: slideInRight 0.4s ease-out forwards; }
+        .zoom-in-95 { animation: zoomIn95 0.4s cubic-bezier(0.23,1,0.32,1) forwards; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-2rem); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(2rem); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes zoomIn95 { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes zoomIn50 { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-1rem); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(1rem); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes zoomIn95 { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+        
+        /* Hide scrollbar for clean file lists */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-[#F4F5F7] text-zinc-800 font-sans selection:bg-orange-200 min-h-screen flex flex-col relative overflow-hidden">
+<body class="bg-[#F4F5F7] text-zinc-800 font-sans selection:bg-brand-200 min-h-screen flex flex-col relative overflow-x-hidden">
 
-    <div class="absolute inset-0 z-0 opacity-[0.3]" style="background-image: radial-gradient(#a1a1aa 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
-    <div class="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-orange-400/10 blur-[120px] pointer-events-none mix-blend-multiply"></div>
+    <!-- Background Decoration -->
+    <div class="fixed inset-0 z-0 opacity-[0.3]" style="background-image: radial-gradient(#a1a1aa 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
+    <div class="fixed top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-brand-400/10 blur-[120px] pointer-events-none mix-blend-multiply"></div>
     <div class="fixed bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-amber-300/15 blur-[100px] pointer-events-none mix-blend-multiply"></div>
 
     <header class="w-full max-w-6xl mx-auto p-4 md:p-6 flex flex-wrap justify-between items-center z-20 relative">
         <div onclick="navigateTo('home')" class="flex items-center gap-3 group cursor-pointer">
-            <div class="bg-gradient-to-br from-orange-500 to-amber-500 p-2.5 rounded-2xl group-hover:shadow-[0_10px_20px_rgba(249,115,22,0.3)] group-hover:-translate-y-0.5 transition-all duration-300">
+            <div class="bg-gradient-to-br from-brand-500 to-amber-500 p-2.5 rounded-2xl group-hover:shadow-[0_10px_20px_rgba(249,115,22,0.3)] group-hover:-translate-y-0.5 transition-all duration-300">
                 <span class="iconify w-7 h-7 text-white" data-icon="solar:shield-check-bold-duotone"></span>
             </div>
-            <span class="text-2xl font-black tracking-tight text-zinc-800 drop-shadow-sm">SecretBridge</span>
+            <span class="text-2xl font-black tracking-tight text-zinc-800 drop-shadow-sm">SecretBridge<span class="text-brand-500 text-sm align-top">V2.5</span></span>
         </div>
 
         <nav class="hidden md:flex items-center gap-2 bg-white/60 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-sm">
-            <button id="nav-btn-home" onclick="navigateTo('home')" class="px-5 py-2 rounded-xl text-sm font-bold transition-all bg-white text-orange-600 shadow-sm">Home</button>
+            <button id="nav-btn-home" onclick="navigateTo('home')" class="px-5 py-2 rounded-xl text-sm font-bold transition-all bg-white text-brand-600 shadow-sm">Home</button>
             <button id="nav-btn-send" onclick="navigateTo('send')" class="px-5 py-2 rounded-xl text-sm font-bold transition-all text-zinc-500 hover:text-zinc-800">Send</button>
             <button id="nav-btn-receive" onclick="navigateTo('receive')" class="px-5 py-2 rounded-xl text-sm font-bold transition-all text-zinc-500 hover:text-zinc-800">Receive</button>
         </nav>
 
         <button onclick="navigateTo('send')" class="hidden md:flex bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold py-2.5 px-5 rounded-xl transition-colors items-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5">
             Open Vault
-            <span class="iconify w-4 h-4 text-orange-400" data-icon="solar:arrow-right-bold-duotone"></span>
+            <span class="iconify w-4 h-4 text-brand-400" data-icon="solar:arrow-right-bold-duotone"></span>
         </button>
     </header>
 
     <main id="main-content" class="flex-1 flex flex-col relative z-10 w-full">
-        <!-- HOME VIEW (Unchanged visually) -->
-        <div id="view-home" class="w-full max-w-6xl mx-auto px-4 pb-20 fade-in">
-            <section class="pt-16 pb-24 md:pt-28 md:pb-32 text-center max-w-4xl mx-auto">
-                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-sm font-bold mb-8 shadow-sm">
-                    <span class="relative flex h-3 w-3">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
-                    </span>
-                    Military-Grade End-to-End Encryption
+        <!-- HOME VIEW -->
+        <div id="view-home" class="w-full max-w-6xl mx-auto px-4 pb-10 fade-in">
+            
+            <!-- Hero Section -->
+            <section class="pt-12 pb-16 md:pt-24 md:pb-24 text-center max-w-4xl mx-auto border-b border-zinc-200/50">
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-50 border border-brand-200 text-brand-600 text-sm font-bold mb-8 shadow-sm">
+                    <span class="iconify w-4 h-4" data-icon="solar:lock-keyhole-minimalistic-bold-duotone"></span>
+                    Now with WebCrypto Hardware Acceleration
                 </div>
                 <h1 class="text-5xl md:text-7xl font-black text-zinc-800 tracking-tight leading-[1.1] mb-6 drop-shadow-sm">
                     Share Secrets With <br />
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">Zero Knowledge.</span>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-amber-400">Zero Knowledge.</span>
                 </h1>
                 <p class="text-lg md:text-xl text-zinc-500 font-medium mb-10 max-w-2xl mx-auto leading-relaxed">
-                    SecretBridge encrypts your files locally in your browser. Send highly sensitive data that self-destructs completely after 10 minutes. No logs. No traces.
+                    Encrypt multiple files and text directly in your browser using AES-GCM & PBKDF2. Secured by a combination of a Mobile Number and a PIN. Self-destructs after 10 minutes.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <button onclick="navigateTo('send')" class="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white rounded-2xl py-4 px-8 flex items-center justify-center gap-3 font-bold text-lg shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:-translate-y-1 transition-all">
-                        <span class="iconify w-6 h-6" data-icon="solar:cloud-upload-bold-duotone"></span> Send Securely
+                    <button onclick="navigateTo('send')" class="w-full sm:w-auto bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-400 hover:to-amber-400 text-white rounded-2xl py-4 px-8 flex items-center justify-center gap-3 font-bold text-lg shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:-translate-y-1 transition-all">
+                        <span class="iconify w-6 h-6" data-icon="solar:shield-up-bold-duotone"></span> Secure Payload
                     </button>
-                    <button onclick="navigateTo('receive')" class="w-full sm:w-auto bg-white border-2 border-zinc-200/80 rounded-2xl py-4 px-8 flex items-center justify-center gap-3 font-bold text-lg shadow-sm hover:-translate-y-1 transition-all">
-                        <span class="iconify w-6 h-6 text-orange-500" data-icon="solar:lock-unlocked-bold-duotone"></span> Receive Payload
+                    <button onclick="navigateTo('receive')" class="w-full sm:w-auto bg-white border-2 border-zinc-200/80 rounded-2xl py-4 px-8 flex items-center justify-center gap-3 font-bold text-lg shadow-sm hover:-translate-y-1 transition-all text-zinc-700">
+                        <span class="iconify w-6 h-6 text-brand-500" data-icon="solar:lock-unlocked-bold-duotone"></span> Open Vault
                     </button>
                 </div>
             </section>
+
+            <!-- Features Section -->
+            <section class="py-16 md:py-20 relative z-10">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-black text-zinc-800 tracking-tight">Enterprise-Grade Security</h2>
+                    <p class="text-zinc-500 mt-3 font-medium">Built with privacy as the core foundation.</p>
+                </div>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mb-6 border border-brand-100">
+                            <span class="iconify w-7 h-7 text-brand-500" data-icon="solar:cpu-bolt-bold-duotone"></span>
+                        </div>
+                        <h3 class="text-xl font-bold text-zinc-800 mb-3">Hardware Accelerated</h3>
+                        <p class="text-zinc-500 text-sm leading-relaxed">Powered by the native Web Crypto API. Your payload is encrypted with AES-GCM directly in your browser using hardware acceleration.</p>
+                    </div>
+                    <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-6 border border-blue-100">
+                            <span class="iconify w-7 h-7 text-blue-500" data-icon="solar:password-minimalistic-bold-duotone"></span>
+                        </div>
+                        <h3 class="text-xl font-bold text-zinc-800 mb-3">PBKDF2 Key Derivation</h3>
+                        <p class="text-zinc-500 text-sm leading-relaxed">We mandate a Mobile Number, Secret PIN, and a secure Salt, hashed 100,000 times to generate encryption keys. Brute-forcing is impossible.</p>
+                    </div>
+                    <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-6 border border-red-100">
+                            <span class="iconify w-7 h-7 text-red-500" data-icon="solar:fire-bold-duotone"></span>
+                        </div>
+                        <h3 class="text-xl font-bold text-zinc-800 mb-3">Auto-Burn Technology</h3>
+                        <p class="text-zinc-500 text-sm leading-relaxed">Once a payload is downloaded or 10 minutes pass, the ciphertext is permanently wiped from our database. No logs are ever kept.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- How It Works Section -->
+            <section class="py-16 md:py-20 border-t border-zinc-200/50">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-black text-zinc-800 tracking-tight">How SecretBridge Works</h2>
+                    <p class="text-zinc-500 mt-3 font-medium">Four simple steps to absolute privacy.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
+                    <div class="text-center relative">
+                        <div class="w-12 h-12 rounded-full bg-zinc-800 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md">1</div>
+                        <h4 class="font-bold text-zinc-800 mb-2">Prepare Payload</h4>
+                        <p class="text-sm text-zinc-500">Type a secure note or attach multiple files.</p>
+                    </div>
+                    <div class="text-center relative">
+                        <div class="w-12 h-12 rounded-full bg-brand-500 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md shadow-brand-500/30">2</div>
+                        <h4 class="font-bold text-zinc-800 mb-2">Set Security</h4>
+                        <p class="text-sm text-zinc-500">Enter a Mobile Number & 6-Digit PIN to lock the data.</p>
+                    </div>
+                    <div class="text-center relative">
+                        <div class="w-12 h-12 rounded-full bg-zinc-800 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md">3</div>
+                        <h4 class="font-bold text-zinc-800 mb-2">Share Link/QR</h4>
+                        <p class="text-sm text-zinc-500">Send the Magic Link or show the QR code to your recipient.</p>
+                    </div>
+                    <div class="text-center relative">
+                        <div class="w-12 h-12 rounded-full bg-brand-500 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md shadow-brand-500/30">4</div>
+                        <h4 class="font-bold text-zinc-800 mb-2">Unlock & Burn</h4>
+                        <p class="text-sm text-zinc-500">Recipient decrypts locally. The server automatically burns the data.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- About Us Section -->
+            <section class="py-16 md:py-20 bg-white/50 backdrop-blur-md border border-white rounded-[2.5rem] p-8 md:p-12 text-center max-w-4xl mx-auto mb-16 shadow-sm">
+                <div class="inline-flex p-3 bg-brand-50 rounded-2xl mb-4 border border-brand-100">
+                    <span class="iconify w-8 h-8 text-brand-500" data-icon="solar:users-group-rounded-bold-duotone"></span>
+                </div>
+                <h2 class="text-3xl font-black text-zinc-800 mb-6">About Us</h2>
+                <p class="text-zinc-600 font-medium leading-relaxed max-w-2xl mx-auto mb-6">
+                    We believe privacy is a fundamental human right. SecretBridge was created to provide a seamless, uncompromising way to share highly sensitive information without ever having to trust a third party. Our open, secure, and purely browser-based architecture ensures that your data belongs exclusively to you.
+                </p>
+                <div class="flex items-center justify-center gap-4">
+                    <a href="#" class="inline-flex items-center gap-2 text-sm font-bold bg-zinc-800 text-white py-2 px-5 rounded-xl hover:bg-zinc-700 transition-colors shadow-sm">
+                        <span class="iconify w-5 h-5" data-icon="bi:github"></span> Open Source Initiative
+                    </a>
+                </div>
+            </section>
+
+            <!-- Footer Section -->
+            <footer class="pt-8 pb-4 text-center flex flex-col items-center justify-center relative">
+                <div class="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-zinc-300 to-transparent"></div>
+                <div class="flex gap-4 mb-5 mt-4">
+                    <a href="#" class="w-10 h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-brand-500 hover:border-brand-200 transition-all shadow-sm hover:-translate-y-0.5">
+                        <span class="iconify w-4 h-4" data-icon="bi:twitter-x"></span>
+                    </a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-brand-500 hover:border-brand-200 transition-all shadow-sm hover:-translate-y-0.5">
+                        <span class="iconify w-4 h-4" data-icon="bi:linkedin"></span>
+                    </a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-brand-500 hover:border-brand-200 transition-all shadow-sm hover:-translate-y-0.5">
+                        <span class="iconify w-4 h-4" data-icon="bi:globe"></span>
+                    </a>
+                </div>
+                <p class="text-sm font-bold text-zinc-800 mb-1">© 2026 SecretBridge. All rights reserved.</p>
+                <div class="text-xs text-zinc-500 font-medium flex items-center justify-center gap-1.5 mt-2 bg-white/60 py-1.5 px-4 rounded-full border border-zinc-200/50 shadow-sm backdrop-blur-sm">
+                    Built with <span class="iconify w-4 h-4 text-red-500 drop-shadow-sm" data-icon="solar:heart-bold"></span> by 
+                    <a href="#" class="text-brand-600 font-bold hover:text-brand-700 transition-colors ml-0.5">Developer Name</a>
+                </div>
+            </footer>
         </div>
 
         <!-- VAULT VIEW -->
-        <div id="view-vault" class="hidden relative w-full max-w-md mx-auto transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] scale-100">
-            <div class="absolute -inset-[1px] bg-gradient-to-br from-orange-200 via-white to-amber-100 rounded-[2.5rem] opacity-50 blur-xl"></div>
+        <div id="view-vault" class="hidden relative w-full max-w-md lg:max-w-lg mx-auto transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] scale-100 mb-10 px-4">
+            <div class="absolute -inset-[1px] bg-gradient-to-br from-brand-200 via-white to-amber-100 rounded-[2.5rem] opacity-60 blur-xl"></div>
             
-            <div class="relative bg-white/95 backdrop-blur-3xl border border-white/60 rounded-[2.5rem] p-7 md:p-9 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden min-h-[500px]">
+            <div class="relative bg-white/95 backdrop-blur-3xl border border-white/60 rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden min-h-[600px] flex flex-col">
                 
                 <!-- UPLOADING / PROCESSING VIEW -->
-                <div id="vault-uploading" class="hidden flex flex-col items-center justify-center py-8 zoom-in-95">
+                <div id="vault-uploading" class="hidden flex-1 flex flex-col items-center justify-center py-8 zoom-in-95">
                     <div class="relative w-24 h-24 mb-8">
                         <div class="absolute inset-0 rounded-full border-4 border-zinc-100"></div>
-                        <div class="absolute inset-0 rounded-full border-4 border-t-orange-500 border-r-amber-400 border-b-transparent border-l-transparent animate-spin"></div>
+                        <div class="absolute inset-0 rounded-full border-4 border-t-brand-500 border-r-amber-400 border-b-transparent border-l-transparent animate-spin"></div>
                         <div class="absolute inset-0 flex items-center justify-center">
-                            <span class="iconify w-8 h-8 text-orange-500 animate-pulse" data-icon="solar:lock-password-bold-duotone"></span>
+                            <span id="process-icon" class="iconify w-8 h-8 text-brand-500 animate-pulse" data-icon="solar:lock-password-bold-duotone"></span>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-extrabold text-zinc-800 mb-2">Processing Data</h3>
-                    <p class="text-zinc-500 text-sm mb-10 text-center font-medium">Military-grade AES-256 securing your payload</p>
+                    <h3 id="process-title" class="text-2xl font-extrabold text-zinc-800 mb-2">Processing Data</h3>
+                    <p id="process-desc" class="text-zinc-500 text-sm mb-10 text-center font-medium">Hardware acceleration active...</p>
                     
                     <div class="w-full h-3 bg-zinc-100 rounded-full overflow-hidden mb-3 relative">
-                        <div id="progress-fill" class="h-full bg-gradient-to-r from-orange-500 to-amber-400 relative transition-all duration-300" style="width: 0%;"></div>
+                        <div id="progress-fill" class="h-full bg-gradient-to-r from-brand-500 to-amber-400 relative transition-all duration-300" style="width: 0%;"></div>
                     </div>
                     <div class="w-full flex justify-between text-sm text-zinc-400 font-bold font-mono">
                         <span id="progress-text">0%</span>
+                        <span id="progress-detail" class="text-brand-500">Initializing</span>
                     </div>
                 </div>
 
-                <!-- SUCCESS VIEW -->
-                <div id="vault-success" class="hidden flex flex-col items-center justify-center py-8 zoom-in-95">
-                    <div class="w-24 h-24 mb-6 rounded-full bg-orange-50 flex items-center justify-center border-4 border-orange-100 zoom-in-50">
-                        <span class="iconify w-12 h-12 text-orange-500" data-icon="solar:check-read-bold-duotone"></span>
+                <!-- SUCCESS VIEW WITH MAGIC LINK & QR -->
+                <div id="vault-success" class="hidden flex-1 flex flex-col items-center justify-center py-2 zoom-in-95">
+                    <div class="w-16 h-16 mb-4 rounded-full bg-brand-50 flex items-center justify-center border-4 border-brand-100">
+                        <span class="iconify w-8 h-8 text-brand-500" data-icon="solar:check-read-bold-duotone"></span>
                     </div>
-                    <h3 class="text-3xl font-black text-zinc-800 mb-3 text-center">Data Secured</h3>
-                    <p class="text-zinc-500 text-sm mb-8 text-center px-4 font-medium">Your payload is encrypted and waiting securely in the vault.</p>
+                    <h3 class="text-2xl font-black text-zinc-800 mb-1 text-center">Data Secured</h3>
+                    <p class="text-zinc-500 text-xs mb-5 text-center px-2 font-medium">Share this link or QR code. It will auto-burn after 10 minutes or upon read.</p>
                     
-                    <button onclick="resetVaultState()" class="w-full py-4 px-4 rounded-2xl bg-zinc-100 text-zinc-700 font-bold transition-all shadow-sm">
+                    <!-- Share Link -->
+                    <div class="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-2 mb-4 flex items-center gap-2 shadow-inner">
+                        <input type="text" id="share-link-input" readonly class="bg-transparent text-xs text-zinc-600 font-medium w-full focus:outline-none pl-2" />
+                        <button onclick="copyShareLink()" class="bg-white border border-zinc-200 p-2 rounded-lg hover:bg-zinc-100 transition-colors text-zinc-700 tooltip-trigger shadow-sm" title="Copy Link">
+                            <span class="iconify w-5 h-5" data-icon="solar:copy-bold-duotone"></span>
+                        </button>
+                    </div>
+
+                    <!-- QR Code -->
+                    <div class="bg-white p-3 rounded-2xl border border-zinc-100 shadow-sm mb-5 flex flex-col items-center">
+                        <div id="qrcode" class="mb-2 w-32 h-32 flex items-center justify-center bg-zinc-50 rounded-lg"></div>
+                        <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                            <span class="iconify w-3 h-3" data-icon="solar:scan-bold-duotone"></span> Scan to unlock
+                        </span>
+                    </div>
+                    
+                    <button onclick="resetVaultState()" class="w-full py-3.5 px-4 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold transition-all shadow-sm text-sm">
                         Process Another Payload
                     </button>
                 </div>
 
-                <!-- DECRYPTED PAYLOAD VIEW -->
-                <div id="vault-decrypted" class="hidden flex flex-col items-center justify-center py-4 zoom-in-95">
-                    <h3 class="text-2xl font-black text-zinc-800 mb-2">Decrypted Secret</h3>
-                    <p class="text-red-500 text-xs font-bold uppercase mb-6 flex items-center gap-1"><span class="iconify" data-icon="solar:fire-bold-duotone"></span> Burned from server</p>
-                    
-                    <textarea id="decrypted-text-display" readonly class="w-full bg-zinc-50 border-2 border-zinc-200 rounded-2xl py-4 px-4 text-sm font-medium text-zinc-800 focus:outline-none resize-none h-40 mb-6 shadow-inner"></textarea>
-                    
-                    <button onclick="resetVaultState()" class="w-full py-4 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold transition-all shadow-sm">
-                        Close & Wipe Memory
-                    </button>
+                <!-- PREVIEW / DECRYPTED VIEW -->
+                <div id="vault-preview" class="hidden flex-1 flex flex-col py-2 zoom-in-95 h-full">
+                    <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-4">
+                        <div>
+                            <h3 class="text-2xl font-black text-zinc-800">Unlocked Vault</h3>
+                            <p class="text-red-500 text-[10px] font-bold uppercase flex items-center gap-1 mt-1">
+                                <span class="iconify" data-icon="solar:fire-bold-duotone"></span> Burned from server
+                            </p>
+                        </div>
+                        <button onclick="wipeAndClose()" class="bg-zinc-100 hover:bg-red-50 text-red-600 p-2.5 rounded-xl transition-colors tooltip-trigger" title="Wipe Memory & Close">
+                            <span class="iconify w-5 h-5" data-icon="solar:trash-bin-trash-bold-duotone"></span>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto no-scrollbar space-y-5 pb-4">
+                        <!-- Text Content -->
+                        <div id="preview-text-container" class="hidden space-y-2">
+                            <label class="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                                <span class="iconify" data-icon="solar:document-text-bold-duotone"></span> Secure Message
+                            </label>
+                            <textarea id="decrypted-text-display" readonly class="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 px-4 text-sm font-medium text-zinc-800 focus:outline-none resize-none min-h-[100px] shadow-inner"></textarea>
+                            <button onclick="copyDecryptedText()" class="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 ml-1">
+                                <span class="iconify" data-icon="solar:copy-bold-duotone"></span> Copy to clipboard
+                            </button>
+                        </div>
+
+                        <!-- Files Content -->
+                        <div id="preview-files-container" class="hidden space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                                    <span class="iconify" data-icon="solar:folder-with-files-bold-duotone"></span> Attached Files
+                                </label>
+                                <button id="download-all-btn" onclick="downloadAllFiles()" class="text-xs font-bold bg-zinc-800 text-white px-3 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">
+                                    Download All
+                                </button>
+                            </div>
+                            <div id="files-grid" class="grid grid-cols-1 gap-3">
+                                <!-- Dynamic File Previews Inject Here -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- IDLE VIEW -->
-                <div id="vault-idle" class="fade-in">
-                    <div class="flex bg-zinc-100/80 p-1.5 rounded-2xl mb-8 border border-zinc-200/50">
-                        <button id="tab-btn-send" onclick="navigateTo('send')" class="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-white text-orange-600 shadow-sm flex justify-center gap-2">
-                            <span class="iconify w-5 h-5" data-icon="solar:cloud-upload-bold-duotone"></span> Send
+                <!-- IDLE / INPUT VIEW -->
+                <div id="vault-idle" class="flex-1 flex flex-col fade-in">
+                    <div class="flex bg-zinc-100/80 p-1.5 rounded-2xl mb-6 border border-zinc-200/50 flex-shrink-0">
+                        <button id="tab-btn-send" onclick="navigateTo('send')" class="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-white text-brand-600 shadow-sm flex justify-center items-center gap-2">
+                            <span class="iconify w-5 h-5" data-icon="solar:shield-up-bold-duotone"></span> Send
                         </button>
-                        <button id="tab-btn-receive" onclick="navigateTo('receive')" class="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center gap-2">
+                        <button id="tab-btn-receive" onclick="navigateTo('receive')" class="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center items-center gap-2 hover:text-zinc-700">
                             <span class="iconify w-5 h-5" data-icon="solar:lock-unlocked-bold-duotone"></span> Receive
                         </button>
                     </div>
 
                     <!-- SEND CONTENT -->
-                    <div id="tab-content-send" class="space-y-6 slide-in-left">
-                        <div class="relative w-full border-2 border-dashed border-zinc-200 hover:border-orange-400 bg-zinc-50/80 rounded-2xl p-7 flex flex-col items-center text-center cursor-pointer transition-all group overflow-hidden">
-                            <!-- Actual File Input -->
-                            <input type="file" id="file-input" onchange="handleFileSelect(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                            
-                            <div class="bg-white p-4 rounded-2xl mb-4 shadow-sm group-hover:-translate-y-1 transition-all">
-                                <span class="iconify w-8 h-8 text-orange-500" data-icon="solar:file-send-bold-duotone"></span>
-                            </div>
-                            <p id="file-display-name" class="text-base font-bold text-zinc-800 mb-1 z-0 relative">Drag & Drop files here</p>
-                            <p class="text-sm text-zinc-500 font-medium z-0 relative">or click to browse your device</p>
+                    <div id="tab-content-send" class="space-y-5 slide-in-left flex-1 overflow-y-auto no-scrollbar pb-2">
+                        <!-- Dual Entropy Security Badge -->
+                        <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-3 items-start">
+                            <span class="iconify w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" data-icon="solar:info-circle-bold-duotone"></span>
+                            <p class="text-xs text-blue-800 font-medium leading-relaxed">
+                                <b>Hardware Accelerated:</b> Files are encrypted using AES-GCM and PBKDF2 locally before transit. The server never sees your keys.
+                            </p>
                         </div>
 
-                        <div class="relative group">
-                            <textarea id="send-textarea" placeholder="Or paste secure text, notes..." class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-orange-400 rounded-2xl py-4 px-4 text-sm font-medium text-zinc-800 placeholder:text-zinc-400 focus:outline-none resize-none h-24 transition-all shadow-inner"></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-zinc-500 mb-2 ml-1 uppercase tracking-wider">Set 6-Digit Encryption Key</label>
-                            <div class="relative group">
-                                <div class="absolute inset-y-0 left-4 flex items-center text-zinc-400">
-                                    <span class="iconify w-6 h-6" data-icon="solar:lock-password-bold-duotone"></span>
+                        <!-- Auth Inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Mobile Number</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                                        <span class="iconify w-5 h-5" data-icon="solar:smartphone-bold-duotone"></span>
+                                    </div>
+                                    <input id="send-mobile-input" type="tel" placeholder="Enter number" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3 pl-10 pr-3 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner text-sm" />
                                 </div>
-                                <input id="send-code-input" type="password" maxlength="6" placeholder="000000" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-orange-400 rounded-2xl py-4 pl-12 pr-14 text-lg tracking-[0.5em] font-mono font-bold text-zinc-800 focus:outline-none transition-all shadow-inner" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Secret PIN (6-digit)</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                                        <span class="iconify w-5 h-5" data-icon="solar:lock-password-bold-duotone"></span>
+                                    </div>
+                                    <input id="send-code-input" type="password" maxlength="6" placeholder="000000" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3 pl-10 pr-3 tracking-[0.3em] font-mono font-bold text-zinc-800 focus:outline-none transition-all shadow-inner text-sm" />
+                                </div>
                             </div>
                         </div>
 
-                        <button id="send-submit-btn" disabled onclick="executeUpload()" class="w-full mt-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl py-4 px-4 flex items-center justify-center gap-3 font-bold text-lg shadow-md hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span class="iconify w-6 h-6" data-icon="solar:shield-check-bold-duotone"></span> Secure & Upload
+                        <!-- Data Inputs -->
+                        <div class="space-y-3">
+                            <div class="relative group">
+                                <textarea id="send-textarea" placeholder="Paste secure text, private notes..." class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-2xl py-3 px-4 text-sm font-medium text-zinc-800 placeholder:text-zinc-400 focus:outline-none resize-none h-20 transition-all shadow-inner"></textarea>
+                            </div>
+
+                            <div class="relative w-full border-2 border-dashed border-zinc-200 hover:border-brand-400 bg-zinc-50/80 rounded-2xl p-5 flex flex-col items-center text-center cursor-pointer transition-all group overflow-hidden">
+                                <input type="file" id="file-input" multiple onchange="handleFilesSelect(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                <div class="bg-white p-3 rounded-2xl mb-2 shadow-sm group-hover:-translate-y-1 transition-transform">
+                                    <span class="iconify w-6 h-6 text-brand-500" data-icon="solar:documents-bold-duotone"></span>
+                                </div>
+                                <p class="text-sm font-bold text-zinc-800 mb-0.5 z-0 relative">Add Multiple Files</p>
+                                <p class="text-xs text-zinc-500 font-medium z-0 relative">Images, PDFs, Zips (Max 25MB total)</p>
+                            </div>
+
+                            <!-- Selected Files List -->
+                            <div id="selected-files-container" class="hidden flex flex-col gap-2 max-h-32 overflow-y-auto no-scrollbar p-1">
+                                <!-- Chips injected here via JS -->
+                            </div>
+                        </div>
+
+                        <button id="send-submit-btn" disabled onclick="executeUpload()" class="w-full bg-gradient-to-r from-brand-500 to-amber-500 text-white rounded-2xl py-4 px-4 flex items-center justify-center gap-3 font-bold text-lg shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-4">
+                            <span class="iconify w-6 h-6" data-icon="solar:lock-keyhole-minimalistic-bold-duotone"></span> Encrypt & Upload
                         </button>
                     </div>
 
                     <!-- RECEIVE CONTENT -->
-                    <div id="tab-content-receive" class="hidden space-y-10 py-6 slide-in-right">
-                        <div class="text-center space-y-3 relative">
-                            <div class="inline-flex p-4 bg-orange-50 rounded-2xl mb-2">
-                                <span class="iconify w-8 h-8 text-orange-500" data-icon="solar:lock-unlocked-bold-duotone"></span>
+                    <div id="tab-content-receive" class="hidden space-y-6 slide-in-right flex-1 flex flex-col justify-center pb-4">
+                        <div class="text-center space-y-2 relative mb-2">
+                            <div class="inline-flex p-3 bg-brand-50 rounded-2xl mb-1 border border-brand-100">
+                                <span class="iconify w-7 h-7 text-brand-500" data-icon="solar:box-minimalistic-bold-duotone"></span>
                             </div>
                             <h3 class="text-2xl font-black text-zinc-800 tracking-tight">Access Vault</h3>
-                            <p class="text-base text-zinc-500 font-medium">Enter your 6-digit decryption key</p>
+                            <p class="text-sm text-zinc-500 font-medium">Enter sender's entropy parameters</p>
                         </div>
 
-                        <div id="otp-container" class="flex justify-between gap-2 sm:gap-3 px-1">
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
-                            <input type="password" maxlength="1" class="otp-input w-11 h-14 sm:w-14 sm:h-16 border-b-4 rounded-xl text-center text-2xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                        <div class="space-y-5">
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Mobile Number</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                                        <span class="iconify w-5 h-5" data-icon="solar:smartphone-bold-duotone"></span>
+                                    </div>
+                                    <input id="receive-mobile-input" type="tel" placeholder="Enter number" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3.5 pl-10 pr-4 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Secret PIN</label>
+                                <div id="otp-container" class="flex justify-between gap-2 px-1">
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                    <input type="password" maxlength="1" class="otp-input w-10 h-12 sm:w-12 sm:h-14 border-b-4 rounded-xl text-center text-xl font-mono font-black focus:outline-none transition-all bg-zinc-50 border-zinc-200 text-zinc-800" />
+                                </div>
+                            </div>
                         </div>
 
-                        <button id="receive-submit-btn" disabled onclick="executeDownload()" class="w-full bg-gradient-to-r from-zinc-800 to-zinc-700 text-white rounded-2xl py-4 px-4 flex items-center justify-center gap-2 font-bold text-lg shadow-md hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button id="receive-submit-btn" disabled onclick="executeDownload()" class="w-full mt-4 bg-zinc-800 text-white rounded-2xl py-4 px-4 flex items-center justify-center gap-2 font-bold text-lg shadow-md hover:-translate-y-0.5 hover:bg-zinc-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                             Unlock Payload
-                            <span class="iconify w-6 h-6 ml-2 text-orange-400" data-icon="solar:alt-arrow-right-bold-duotone"></span>
+                            <span class="iconify w-6 h-6 ml-1 text-brand-400" data-icon="solar:alt-arrow-right-bold-duotone"></span>
                         </button>
                     </div>
                 </div>
@@ -222,24 +414,71 @@
         </div>
     </main>
 
+    <!-- Fullscreen Image Preview Modal (Hidden) -->
+    <div id="image-modal" class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center p-4 backdrop-blur-sm fade-in">
+        <button onclick="closeImageModal()" class="absolute top-6 right-6 text-white hover:text-brand-400 transition-colors bg-white/10 p-2 rounded-full">
+            <span class="iconify w-6 h-6" data-icon="solar:close-circle-bold-duotone"></span>
+        </button>
+        <img id="modal-img" src="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+        <div id="modal-caption" class="absolute bottom-6 text-white font-medium text-sm bg-black/50 px-4 py-2 rounded-full backdrop-blur-md"></div>
+    </div>
+
     <script>
         // API CONFIGURATION
         const API_URL = "https://secret-bridge-1.onrender.com/api";
         const API_KEY = "super_secret_bridge_api_key_2024";
 
+        // Global State
         let activeTab = 'home'; 
+        let selectedFiles = []; 
+        let decryptedFilesData = []; 
+        let qrCodeInstance = null;
+
+        // DOM Elements
         const viewHome = document.getElementById('view-home');
         const viewVault = document.getElementById('view-vault');
         const vaultIdle = document.getElementById('vault-idle');
         const vaultUploading = document.getElementById('vault-uploading');
         const vaultSuccess = document.getElementById('vault-success');
-        const vaultDecrypted = document.getElementById('vault-decrypted');
+        const vaultPreview = document.getElementById('vault-preview');
         
+        const sendMobileInput = document.getElementById('send-mobile-input');
         const sendCodeInput = document.getElementById('send-code-input');
         const sendSubmitBtn = document.getElementById('send-submit-btn');
+        const filesContainer = document.getElementById('selected-files-container');
+        const fileInput = document.getElementById('file-input');
+        
+        const receiveMobileInput = document.getElementById('receive-mobile-input');
         const otpInputs = document.querySelectorAll('.otp-input');
         const receiveSubmitBtn = document.getElementById('receive-submit-btn');
         
+        // Formatting Helpers
+        const formatBytes = (bytes, decimals = 2) => {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        };
+
+        // Initialize Magic Link Listeners & Routing
+        function handleHashRouting() {
+            if (window.location.hash.startsWith('#vault=')) {
+                const mobile = window.location.hash.split('=')[1];
+                navigateTo('receive');
+                receiveMobileInput.value = mobile;
+                checkReceiveValidation();
+                setTimeout(() => {
+                    const firstOtpInput = document.querySelector('.otp-input');
+                    if (firstOtpInput) firstOtpInput.focus();
+                }, 500);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', handleHashRouting);
+        window.addEventListener('hashchange', handleHashRouting);
+
         // Navigation Logic
         function navigateTo(tab) {
             activeTab = tab;
@@ -256,167 +495,307 @@
                 document.getElementById('tab-content-receive').classList.toggle('hidden', tab !== 'receive');
                 
                 document.getElementById('tab-btn-send').className = tab === 'send' 
-                    ? "flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-white text-orange-600 shadow-sm flex justify-center gap-2 scale-[1.02] transition-all"
-                    : "flex-1 py-3 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center gap-2 transition-all";
+                    ? "flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-white text-brand-600 shadow-sm flex justify-center items-center gap-2 scale-[1.02] transition-all"
+                    : "flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center items-center gap-2 transition-all hover:text-zinc-700 hover:bg-white/50";
                 document.getElementById('tab-btn-receive').className = tab === 'receive'
-                    ? "flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-white text-orange-600 shadow-sm flex justify-center gap-2 scale-[1.02] transition-all"
-                    : "flex-1 py-3 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center gap-2 transition-all";
+                    ? "flex-1 py-2.5 px-4 rounded-xl text-sm font-bold bg-white text-brand-600 shadow-sm flex justify-center items-center gap-2 scale-[1.02] transition-all"
+                    : "flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-zinc-500 flex justify-center items-center gap-2 transition-all hover:text-zinc-700 hover:bg-white/50";
             }
         }
 
         // File Selection Logic
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            const display = document.getElementById('file-display-name');
-            if(file) {
-                display.innerHTML = `<span class="text-orange-500">${file.name}</span> selected`;
-                document.getElementById('send-textarea').value = ''; // Clear text if file selected
-            } else {
-                display.innerText = "Drag & Drop files here";
-            }
+        function handleFilesSelect(event) {
+            const newFiles = Array.from(event.target.files);
+            selectedFiles = [...selectedFiles, ...newFiles];
+            updateFilesUI();
+            checkSendValidation();
+            fileInput.value = '';
         }
 
-        // Send Input Listeners
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilesUI();
+            checkSendValidation();
+        }
+
+        function updateFilesUI() {
+            if (selectedFiles.length === 0) {
+                filesContainer.classList.add('hidden');
+                filesContainer.innerHTML = '';
+                return;
+            }
+            
+            filesContainer.classList.remove('hidden');
+            filesContainer.innerHTML = selectedFiles.map((f, i) => `
+                <div class="flex items-center justify-between bg-white border border-zinc-200 rounded-lg p-2.5 shadow-sm slide-in-left">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="bg-brand-50 p-1.5 rounded-md flex-shrink-0">
+                            <span class="iconify w-4 h-4 text-brand-500" data-icon="${getFileIcon(f.type)}"></span>
+                        </div>
+                        <div class="flex flex-col truncate">
+                            <span class="text-xs font-bold text-zinc-700 truncate">${f.name}</span>
+                            <span class="text-[10px] font-medium text-zinc-400">${formatBytes(f.size)}</span>
+                        </div>
+                    </div>
+                    <button onclick="removeFile(${i})" class="text-zinc-400 hover:text-red-500 p-1 flex-shrink-0 transition-colors">
+                        <span class="iconify w-4 h-4" data-icon="solar:close-circle-bold"></span>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function getFileIcon(mime) {
+            if (!mime) return "solar:document-bold-duotone";
+            if (mime.startsWith('image/')) return "solar:gallery-bold-duotone";
+            if (mime.startsWith('video/')) return "solar:video-frame-play-bold-duotone";
+            if (mime.includes('pdf')) return "solar:document-text-bold-duotone";
+            if (mime.includes('zip') || mime.includes('rar')) return "solar:archive-bold-duotone";
+            return "solar:file-bold-duotone";
+        }
+
+        // Validations
+        function checkSendValidation() {
+            const hasMobile = sendMobileInput.value.replace(/\D/g, '').length >= 7;
+            const hasPin = sendCodeInput.value.length === 6;
+            const hasData = document.getElementById('send-textarea').value.trim().length > 0 || selectedFiles.length > 0;
+            sendSubmitBtn.disabled = !(hasMobile && hasPin && hasData);
+        }
+
+        sendMobileInput.addEventListener('input', checkSendValidation);
         sendCodeInput.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/\D/g, ''); 
-            sendSubmitBtn.disabled = e.target.value.length < 6;
+            checkSendValidation();
         });
+        document.getElementById('send-textarea').addEventListener('input', checkSendValidation);
 
-        // OTP Listeners
+        function checkReceiveValidation() {
+            const hasMobile = receiveMobileInput.value.replace(/\D/g, '').length >= 7;
+            const otpCode = Array.from(otpInputs).map(i => i.value).join('');
+            const hasPin = otpCode.length === 6;
+            receiveSubmitBtn.disabled = !(hasMobile && hasPin);
+        }
+
+        receiveMobileInput.addEventListener('input', checkReceiveValidation);
+
         otpInputs.forEach((input, index) => {
             input.addEventListener('input', (e) => {
                 let val = e.target.value.replace(/\D/g, '');
                 e.target.value = val.substring(val.length - 1);
                 
                 if (e.target.value) {
-                    input.classList.add('border-orange-500', 'bg-white', 'text-orange-600');
+                    input.classList.add('border-brand-500', 'bg-white', 'text-brand-600', 'shadow-sm');
                     if (index < 5) otpInputs[index + 1].focus();
                 } else {
-                    input.classList.remove('border-orange-500', 'bg-white', 'text-orange-600');
+                    input.classList.remove('border-brand-500', 'bg-white', 'text-brand-600', 'shadow-sm');
                 }
-                
-                receiveSubmitBtn.disabled = Array.from(otpInputs).map(i => i.value).join('').length < 6;
+                checkReceiveValidation();
             });
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index - 1].focus();
             });
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                if (!text) return;
+                const chars = text.split('');
+                for (let i = 0; i < 6; i++) {
+                    if (index + i < 6 && chars[i]) {
+                        otpInputs[index + i].value = chars[i];
+                        otpInputs[index + i].classList.add('border-brand-500', 'bg-white', 'text-brand-600', 'shadow-sm');
+                    }
+                }
+                if (index + chars.length < 6) otpInputs[index + chars.length].focus();
+                else otpInputs[5].focus();
+                checkReceiveValidation();
+            });
         });
+
+        // ==========================================
+        // WEB CRYPTO API ENGINE (AES-GCM + PBKDF2)
+        // ==========================================
+        async function sha256Hash(text) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function deriveKey(password, salt) {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits", "deriveKey"]);
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                keyMaterial,
+                { name: "AES-GCM", length: 256 },
+                true,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        async function encryptData(plainText, password) {
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await deriveKey(password, salt);
+            
+            const enc = new TextEncoder();
+            const encryptedBuffer = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(plainText));
+            
+            // Bundle Salt (16 bytes) + IV (12 bytes) + Ciphertext
+            const combined = new Uint8Array(salt.length + iv.length + encryptedBuffer.byteLength);
+            combined.set(salt, 0);
+            combined.set(iv, salt.length);
+            combined.set(new Uint8Array(encryptedBuffer), salt.length + iv.length);
+            
+            return arrayBufferToBase64(combined.buffer);
+        }
+
+        async function decryptData(base64Ciphertext, password) {
+            const combined = new Uint8Array(base64ToArrayBuffer(base64Ciphertext));
+            const salt = combined.slice(0, 16);
+            const iv = combined.slice(16, 28);
+            const data = combined.slice(28);
+            
+            const key = await deriveKey(password, salt);
+            const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data);
+            
+            const dec = new TextDecoder();
+            return dec.decode(decryptedBuffer);
+        }
+
+        // Memory-safe Base64 conversion
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                const chunk = bytes.subarray(i, i + chunkSize);
+                binary += String.fromCharCode.apply(null, chunk);
+            }
+            return window.btoa(binary);
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binary_string = window.atob(base64);
+            const len = binary_string.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) { bytes[i] = binary_string.charCodeAt(i); }
+            return bytes.buffer;
+        }
 
         // ==========================================
         // E2EE UPLOAD LOGIC
         // ==========================================
         async function executeUpload() {
-            const code = sendCodeInput.value;
-            const textData = document.getElementById('send-textarea').value;
-            const fileInput = document.getElementById('file-input');
+            const mobile = sendMobileInput.value.replace(/\D/g, '');
+            const pin = sendCodeInput.value;
+            const textData = document.getElementById('send-textarea').value.trim();
             
-            if (!textData && fileInput.files.length === 0) return alert("Please enter text or attach a file.");
+            const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+            if (totalSize > 25 * 1024 * 1024) { 
+                return alert("Total file size exceeds 25MB limit. Please remove some files to prevent browser memory exhaustion.");
+            }
 
-            startProcessing(10); // Start visual progress
+            startProcessing(5, "Reading Files", "solar:cpu-bolt-bold-duotone");
 
             try {
-                let rawData = "";
-                let dataType = "";
-                
-                // Read File as Base64 OR use Text
-                if (fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    const base64Str = await fileToBase64(file);
-                    // Append filename so we know what to name it when downloading
-                    rawData = file.name + "|||" + base64Str; 
-                    dataType = "file";
-                } else {
-                    rawData = textData;
-                    dataType = "text";
-                }
+                // Read files asynchronously
+                updateProgress(15, "Converting data blocks...");
+                const filePayloads = await Promise.all(selectedFiles.map(async file => ({
+                    n: file.name,
+                    t: file.type || 'application/octet-stream',
+                    s: file.size,
+                    d: await fileToBase64(file)
+                })));
 
-                updateProgress(40);
+                const rawData = JSON.stringify({ msg: textData, files: filePayloads });
 
-                // 1. Hash the code to create a DB record ID (Server NEVER sees the raw password)
-                const recordId = CryptoJS.SHA256(code).toString();
+                updateProgress(40, "Hardware AES-GCM Encryption...");
 
-                // 2. Encrypt the data using AES-256 and the raw 6-digit code as the key
-                const ciphertext = CryptoJS.AES.encrypt(rawData, code).toString();
+                // Generate Entropy Key
+                const entropyKey = mobile + pin;
+                const recordId = await sha256Hash(entropyKey);
 
-                updateProgress(80);
+                // Encrypt payload via WebCrypto API
+                const ciphertext = await encryptData(rawData, entropyKey);
 
-                // 3. Send Encrypted Data to Python API
+                updateProgress(80, "Connecting to Secure Vault...");
+
+                // Transmit to API
                 const response = await fetch(`${API_URL}/store`, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-API-Key': API_KEY 
-                    },
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
                     body: JSON.stringify({
                         id: recordId,
                         ciphertext: ciphertext,
-                        data_type: dataType
+                        data_type: "json_payload_v2"
                     })
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.error || "Upload failed.");
+                    throw new Error(error.error || "Upload failed. Server may be unreachable.");
                 }
 
-                updateProgress(100);
+                updateProgress(100, "Finalizing...");
                 setTimeout(() => {
                     vaultUploading.classList.add('hidden');
+                    generateShareUX(mobile);
                     vaultSuccess.classList.remove('hidden');
-                }, 500);
+                    
+                    // Wipe Memory
+                    selectedFiles = [];
+                    updateFilesUI();
+                }, 600);
 
             } catch (err) {
-                alert("Error: " + err.message);
+                alert("Encryption/Upload Error: " + err.message);
                 resetVaultState();
             }
         }
 
         // ==========================================
-        // E2EE DOWNLOAD LOGIC
+        // E2EE DOWNLOAD & PREVIEW LOGIC
         // ==========================================
         async function executeDownload() {
-            const code = Array.from(otpInputs).map(i => i.value).join('');
-            startProcessing(20);
+            const mobile = receiveMobileInput.value.replace(/\D/g, '');
+            const pin = Array.from(otpInputs).map(i => i.value).join('');
+            
+            startProcessing(20, "Locating Vault", "solar:radar-bold-duotone");
 
             try {
-                // 1. Hash the inputted code to lookup the ID
-                const recordId = CryptoJS.SHA256(code).toString();
+                const entropyKey = mobile + pin;
+                const recordId = await sha256Hash(entropyKey);
 
-                // 2. Fetch the ciphertext from the Python API
+                updateProgress(40, "Downloading Ciphertext...");
+
                 const response = await fetch(`${API_URL}/retrieve/${recordId}`, {
                     method: 'GET',
                     headers: { 'X-API-Key': API_KEY }
                 });
 
-                if (!response.ok) throw new Error("Payload not found, incorrect code, or it has been burned.");
+                if (!response.ok) throw new Error("Payload not found, incorrect credentials, or it has burned.");
                 const data = await response.json();
 
-                updateProgress(60);
+                updateProgress(70, "Hardware AES-GCM Decryption...");
 
-                // 3. Decrypt the Data using the user's raw code
-                const bytes = CryptoJS.AES.decrypt(data.ciphertext, code);
-                const decryptedRaw = bytes.toString(CryptoJS.enc.Utf8);
+                // Decrypt using native WebCrypto
+                let decryptedRaw;
+                try {
+                    decryptedRaw = await decryptData(data.ciphertext, entropyKey);
+                } catch(e) {
+                    throw new Error("Decryption failed. Authentication Tag validation error. Invalid PIN/Mobile or data corrupted.");
+                }
 
-                if (!decryptedRaw) throw new Error("Decryption failed. Data may be corrupted.");
+                updateProgress(90, "Parsing Data...");
 
-                updateProgress(100);
+                let payloadObj = JSON.parse(decryptedRaw);
+
+                updateProgress(100, "Opening Vault...");
 
                 setTimeout(() => {
                     vaultUploading.classList.add('hidden');
-                    
-                    if (data.data_type === "text") {
-                        // Display Text
-                        vaultDecrypted.classList.remove('hidden');
-                        document.getElementById('decrypted-text-display').value = decryptedRaw;
-                    } else {
-                        // Trigger File Download
-                        const parts = decryptedRaw.split("|||");
-                        const fileName = parts[0];
-                        const base64Data = parts[1];
-                        triggerDownload(base64Data, fileName);
-                        resetVaultState();
-                        alert(`File ${fileName} has been decrypted and downloaded.`);
-                    }
+                    renderPreviewVault(payloadObj);
                 }, 500);
 
             } catch (err) {
@@ -425,7 +804,76 @@
             }
         }
 
-        // --- Helpers ---
+        // --- UX / UI Helpers ---
+        function generateShareUX(mobile) {
+            const baseUrl = window.location.href.split('#')[0];
+            const shareUrl = `${baseUrl}#vault=${mobile}`;
+            document.getElementById('share-link-input').value = shareUrl;
+            
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; 
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: shareUrl,
+                width: 128,
+                height: 128,
+                colorDark : "#27272a",
+                colorLight : "#f8fafc",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+        }
+
+        function copyShareLink() {
+            const input = document.getElementById('share-link-input');
+            input.select();
+            document.execCommand('copy');
+            alert("Magic Link copied to clipboard!");
+        }
+
+        function renderPreviewVault(payload) {
+            vaultPreview.classList.remove('hidden');
+            
+            const textContainer = document.getElementById('preview-text-container');
+            const textArea = document.getElementById('decrypted-text-display');
+            if (payload.msg && payload.msg.trim() !== "") {
+                textContainer.classList.remove('hidden');
+                textArea.value = payload.msg;
+            } else {
+                textContainer.classList.add('hidden');
+            }
+
+            const filesContainerUI = document.getElementById('preview-files-container');
+            const filesGrid = document.getElementById('files-grid');
+            decryptedFilesData = payload.files || [];
+
+            if (decryptedFilesData.length > 0) {
+                filesContainerUI.classList.remove('hidden');
+                filesGrid.innerHTML = decryptedFilesData.map((f, i) => {
+                    const isImage = f.t && f.t.startsWith('image/');
+                    return `
+                    <div class="flex items-center justify-between bg-white border border-zinc-200 rounded-xl p-3 shadow-sm hover:border-brand-200 transition-colors">
+                        <div class="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer" onclick="${isImage ? `openImageModal(${i})` : `triggerDownloadSingle(${i})`}">
+                            <div class="${isImage ? 'bg-amber-50' : 'bg-brand-50'} p-2 rounded-lg flex-shrink-0">
+                                <span class="iconify w-6 h-6 ${isImage ? 'text-amber-500' : 'text-brand-500'}" data-icon="${getFileIcon(f.t)}"></span>
+                            </div>
+                            <div class="flex flex-col truncate pr-2">
+                                <span class="text-sm font-bold text-zinc-800 truncate">${f.n}</span>
+                                <span class="text-xs font-medium text-zinc-400 flex items-center gap-1">
+                                    ${f.s ? formatBytes(f.s) : 'Unknown Size'} 
+                                    ${isImage ? '<span class="text-amber-500 font-bold ml-1">• Tap to view</span>' : ''}
+                                </span>
+                            </div>
+                        </div>
+                        <button onclick="triggerDownloadSingle(${i})" class="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 p-2 rounded-lg flex-shrink-0 transition-colors tooltip-trigger" title="Save File">
+                            <span class="iconify w-5 h-5" data-icon="solar:download-minimalistic-bold-duotone"></span>
+                        </button>
+                    </div>
+                `}).join('');
+            } else {
+                filesContainerUI.classList.add('hidden');
+            }
+        }
+
+        // --- File System Helpers ---
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -435,47 +883,97 @@
             });
         }
 
-        function triggerDownload(base64Str, fileName) {
+        function triggerDownloadSingle(index) {
+            const f = decryptedFilesData[index];
+            if(!f) return;
             const a = document.createElement("a");
-            a.href = base64Str;
-            a.download = fileName;
+            a.href = f.d; 
+            a.download = f.n;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         }
 
-        function startProcessing(initProgress) {
+        function downloadAllFiles() {
+            decryptedFilesData.forEach((f, i) => {
+                setTimeout(() => triggerDownloadSingle(i), i * 300); 
+            });
+        }
+
+        function openImageModal(index) {
+            const f = decryptedFilesData[index];
+            if(!f) return;
+            const modal = document.getElementById('image-modal');
+            const img = document.getElementById('modal-img');
+            const caption = document.getElementById('modal-caption');
+            
+            img.src = f.d;
+            caption.innerText = `${f.n} (${formatBytes(f.s)})`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('image-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('modal-img').src = '';
+        }
+
+        function copyDecryptedText() {
+            const text = document.getElementById('decrypted-text-display');
+            text.select();
+            document.execCommand('copy');
+        }
+
+        function wipeAndClose() {
+            decryptedFilesData = [];
+            document.getElementById('decrypted-text-display').value = '';
+            document.getElementById('files-grid').innerHTML = '';
+            resetVaultState();
+        }
+
+        function startProcessing(initProgress, statusText, icon = "solar:lock-password-bold-duotone") {
             viewVault.classList.add('scale-[1.03]', '-translate-y-2');
             vaultIdle.classList.add('hidden');
             vaultUploading.classList.remove('hidden');
-            updateProgress(initProgress);
+            document.getElementById('process-icon').setAttribute('data-icon', icon);
+            updateProgress(initProgress, statusText);
         }
 
-        function updateProgress(val) {
+        function updateProgress(val, text) {
             document.getElementById('progress-fill').style.width = `${val}%`;
             document.getElementById('progress-text').innerText = `${val}%`;
+            if(text) document.getElementById('progress-detail').innerText = text;
         }
 
         function resetVaultState() {
             viewVault.classList.remove('scale-[1.03]', '-translate-y-2');
             vaultUploading.classList.add('hidden');
             vaultSuccess.classList.add('hidden');
-            vaultDecrypted.classList.add('hidden');
+            vaultPreview.classList.add('hidden');
             vaultIdle.classList.remove('hidden');
             
+            // Clear Send Form
+            sendMobileInput.value = '';
             sendCodeInput.value = '';
             document.getElementById('send-textarea').value = '';
-            document.getElementById('file-input').value = '';
-            document.getElementById('file-display-name').innerText = "Drag & Drop files here";
-            sendSubmitBtn.disabled = true;
+            selectedFiles = [];
+            updateFilesUI();
+            checkSendValidation();
             
+            // Clear Receive Form
+            window.location.hash = ''; // Clear magic link from URL
+            receiveMobileInput.value = '';
             otpInputs.forEach(i => {
                 i.value = '';
-                i.classList.remove('border-orange-500', 'bg-white', 'text-orange-600');
+                i.classList.remove('border-brand-500', 'bg-white', 'text-brand-600', 'shadow-sm');
             });
-            receiveSubmitBtn.disabled = true;
+            checkReceiveValidation();
         }
     </script>
 </body>
 </html>
+
+
 
