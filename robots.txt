@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /vault_storage/
+Disallow: /#vault=
+
+Sitemap: https://secretbridge.vercel.app/sitemap.xml
