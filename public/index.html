@@ -113,7 +113,7 @@
                     <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-amber-400">Zero Knowledge.</span>
                 </h1>
                 <p class="text-lg md:text-xl text-zinc-500 font-medium mb-10 max-w-2xl mx-auto leading-relaxed">
-                    Encrypt multiple files and text directly in your browser using AES-GCM & PBKDF2. Secured by a combination of a Mobile Number and a PIN. Self-destructs after 10 minutes.
+                    Encrypt multiple files and text directly in your browser using AES-GCM & PBKDF2. Secured by a combination of a Vault Id and a six digit PIN. Self-destructs after 10 minutes.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <button onclick="navigateTo('send')" class="w-full sm:w-auto bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-400 hover:to-amber-400 text-white rounded-2xl py-4 px-8 flex items-center justify-center gap-3 font-bold text-lg shadow-[0_8px_20px_rgba(249,115,22,0.3)] hover:-translate-y-1 transition-all">
@@ -144,7 +144,7 @@
                             <span class="iconify w-7 h-7 text-blue-500" data-icon="solar:password-minimalistic-bold-duotone"></span>
                         </div>
                         <h3 class="text-xl font-bold text-zinc-800 mb-3">PBKDF2 Key Derivation</h3>
-                        <p class="text-zinc-500 text-sm leading-relaxed">We mandate a Mobile Number, Secret PIN, and a secure Salt, hashed 100,000 times to generate encryption keys. Brute-forcing is impossible.</p>
+                        <p class="text-zinc-500 text-sm leading-relaxed">We mandate a Vault I, Secret PIN, and a secure Salt, hashed 100,000 times to generate encryption keys. Brute-forcing is impossible.</p>
                     </div>
                     <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow">
                         <div class="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-6 border border-red-100">
@@ -171,7 +171,7 @@
                     <div class="text-center relative">
                         <div class="w-12 h-12 rounded-full bg-brand-500 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md shadow-brand-500/30">2</div>
                         <h4 class="font-bold text-zinc-800 mb-2">Set Security</h4>
-                        <p class="text-sm text-zinc-500">Enter a Mobile Number & 6-Digit PIN to lock the data.</p>
+                        <p class="text-sm text-zinc-500">Enter a Vault Id & 6-Digit PIN to lock the data.</p>
                     </div>
                     <div class="text-center relative">
                         <div class="w-12 h-12 rounded-full bg-zinc-800 text-white font-black flex items-center justify-center text-xl mx-auto mb-4 z-10 relative shadow-md">3</div>
@@ -347,12 +347,12 @@
                         <!-- Auth Inputs -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Mobile Number</label>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Vault Id </label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-3 flex items-center text-zinc-400">
                                         <span class="iconify w-5 h-5" data-icon="solar:smartphone-bold-duotone"></span>
                                     </div>
-                                    <input id="send-mobile-input" type="tel" placeholder="Enter number" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3 pl-10 pr-3 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner text-sm" />
+                                    <input id="send-mobile-input" type="tel" placeholder="Enter Vault Id" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3 pl-10 pr-3 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner text-sm" />
                                 </div>
                             </div>
                             <div>
@@ -404,12 +404,12 @@
 
                         <div class="space-y-5">
                             <div>
-                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Mobile Number</label>
+                                <label class="block text-xs font-bold text-zinc-500 mb-1.5 ml-1 uppercase tracking-wider">Vault Id</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-3 flex items-center text-zinc-400">
                                         <span class="iconify w-5 h-5" data-icon="solar:smartphone-bold-duotone"></span>
                                     </div>
-                                    <input id="receive-mobile-input" type="tel" placeholder="Enter number" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3.5 pl-10 pr-4 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner" />
+                                    <input id="receive-mobile-input" type="tel" placeholder="Enter vault id" class="w-full bg-zinc-50 border-2 border-transparent focus:bg-white focus:border-brand-400 rounded-xl py-3.5 pl-10 pr-4 font-bold text-zinc-800 focus:outline-none transition-all shadow-inner" />
                                 </div>
                             </div>
 
