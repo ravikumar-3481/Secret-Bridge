@@ -3,3 +3,4 @@ Flask-Cors
 numpy
 scikit-learn
 Werkzeug
+gunicorn
