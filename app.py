@@ -5,7 +5,7 @@ import threading
 import uuid
 import hmac
 import numpy as np
-from flask import Flask, request, jsonify, send_file, Response
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from sklearn.ensemble import IsolationForest
@@ -16,157 +16,154 @@ from sklearn.ensemble import IsolationForest
 app = Flask(__name__)
 CORS(app)
 
-# Increase max upload size to 2 GB (2048 MB)
+# 2 GB Upload limit
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024 
 
 # Storage Directories
 VAULT_DIR = "./vault_storage"
+TEMP_DIR = "./vault_temp"
 os.makedirs(VAULT_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 API_KEY = "super_secret_bridge_api_key_2024"
-DB_NAME = "secret_bridge_v3.db"
+DB_NAME = "secret_bridge_prod.db"
 
 # ==========================================
 # 1. MACHINE LEARNING: AI SECURITY SHIELD
 # ==========================================
 class AISecurityShield:
-    """
-    Uses Machine Learning (Isolation Forest) to detect abusive upload patterns,
-    DDoS attempts, and bandwidth hogs to preserve server upload speed.
-    """
     def __init__(self):
-        self.model = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
+        self.model = IsolationForest(n_estimators=100, contamination=0.01, random_state=42)
         self.ip_history = {}
         self._pre_train_model()
-        print("[AI Shield] Isolation Forest Anomaly Detection Model Initialized.")
+        print("[AI Shield] Anomaly Detection Model Initialized.")
 
     def _pre_train_model(self):
-        """Trains the model on dummy 'normal' traffic to establish a baseline."""
         # Features: [content_length_mb, seconds_since_last_req, total_reqs_today]
+        # Chunking ke liye requests zyada hongi, isliye baseline update kiya gaya hai
         normal_traffic = np.array([
-            [5.0, 300, 1], [15.0, 1500, 2], [50.0, 3600, 1], 
+            [5.0, 300, 1], [15.0, 1500, 2], [5.0, 1, 50],  # Parallel chunks baseline
             [1.0, 60, 5], [200.0, 86400, 1], [10.0, 600, 3]
         ])
         self.model.fit(normal_traffic)
 
     def analyze_request(self, ip_address, content_length):
-        """Extracts features and predicts if the request is an anomaly/attack."""
         current_time = time.time()
         length_mb = (content_length or 0) / (1024 * 1024)
 
         if ip_address not in self.ip_history:
             self.ip_history[ip_address] = {'last_req': current_time, 'count': 1}
-            return False # First request is fine
+            return False 
 
         history = self.ip_history[ip_address]
         time_diff = current_time - history['last_req']
         history['last_req'] = current_time
         history['count'] += 1
 
-        # Extract live features
         features = np.array([[length_mb, time_diff, history['count']]])
-        
-        # Predict: 1 is normal, -1 is anomaly (e.g., sending 2GB every 2 seconds)
         prediction = self.model.predict(features)[0]
         
-        if prediction == -1:
-            print(f"[AI Shield] 🚨 Anomaly detected from IP: {ip_address}. Blocking to preserve bandwidth.")
-            return True # Is Anomaly
+        if prediction == -1 and time_diff > 2: # Ignore rapid chunk bursts from anomaly
+            print(f"[AI Shield] 🚨 Anomaly detected from IP: {ip_address}")
+            return True
         return False
 
 ai_shield = AISecurityShield()
 
 # ==========================================
-# 2. DATABASE & DISK MANAGEMENT
+# 2. STRONG SQL DATABASE MANAGER
 # ==========================================
 class SecureVaultManager:
     def __init__(self, db_file=DB_NAME):
         self.db_file = db_file
-        self.cleanup_interval = 60 # Check every 60 seconds
         self._init_db()
         self._start_cleanup_daemon()
 
     def _init_db(self):
+        """Production level normalized schema with WAL mode"""
         with sqlite3.connect(self.db_file) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;") # Fast concurrency
+            conn.execute("PRAGMA synchronous=NORMAL;")
             cursor = conn.cursor()
-            # Changed schema: We now store the file_path on disk instead of the raw ciphertext in DB
+            
+            # Vaults Table (Session details)
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS vault_v3 (
-                    id TEXT PRIMARY KEY,
+                CREATE TABLE IF NOT EXISTS vaults (
+                    vault_id TEXT PRIMARY KEY,
+                    created_at REAL NOT NULL,
+                    expires_at REAL NOT NULL
+                )
+            ''')
+            # Text Messages Table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS vault_texts (
+                    vault_id TEXT PRIMARY KEY,
+                    ciphertext TEXT NOT NULL,
+                    FOREIGN KEY(vault_id) REFERENCES vaults(vault_id) ON DELETE CASCADE
+                )
+            ''')
+            # Files Table (Chunk tracking & metadata)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS vault_files (
+                    file_id TEXT PRIMARY KEY,
+                    vault_id TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    mime_type TEXT,
+                    file_size INTEGER,
                     file_path TEXT NOT NULL,
-                    data_type TEXT NOT NULL,
-                    expiry_time REAL NOT NULL
+                    total_chunks INTEGER NOT NULL,
+                    uploaded_chunks INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'pending',
+                    FOREIGN KEY(vault_id) REFERENCES vaults(vault_id) ON DELETE CASCADE
                 )
             ''')
             conn.commit()
-        print(f"[Database] SQLite routing DB initialized.")
+        print(f"[Database] SQLite WAL DB Initialized.")
 
     def _start_cleanup_daemon(self):
         daemon = threading.Thread(target=self._auto_delete_worker, daemon=True)
         daemon.start()
 
     def _auto_delete_worker(self):
-        """Scans DB and safely deletes files from the SSD to free up space."""
+        """Automatically burns expired files from SSD and DB"""
         while True:
             try:
                 current_time = time.time()
                 with sqlite3.connect(self.db_file) as conn:
                     cursor = conn.cursor()
-                    cursor.execute("SELECT id, file_path FROM vault_v3 WHERE expiry_time <= ?", (current_time,))
-                    expired_records = cursor.fetchall()
                     
-                    for rec_id, fpath in expired_records:
-                        # 1. Delete from Disk
-                        if os.path.exists(fpath):
-                            os.remove(fpath)
-                        # 2. Delete from DB
-                        cursor.execute("DELETE FROM vault_v3 WHERE id = ?", (rec_id,))
+                    # Find expired vaults
+                    cursor.execute("SELECT vault_id FROM vaults WHERE expires_at <= ?", (current_time,))
+                    expired_vaults = cursor.fetchall()
+                    
+                    for (v_id,) in expired_vaults:
+                        # Get associated files to delete from SSD
+                        cursor.execute("SELECT file_path FROM vault_files WHERE vault_id = ?", (v_id,))
+                        for (fpath,) in cursor.fetchall():
+                            if os.path.exists(fpath):
+                                os.remove(fpath)
+                                
+                        # Delete temp chunks if any left
+                        for f in os.listdir(TEMP_DIR):
+                            if f.startswith(v_id):
+                                os.remove(os.path.join(TEMP_DIR, f))
+                                
+                        # Cascade delete will handle DB records
+                        cursor.execute("DELETE FROM vaults WHERE vault_id = ?", (v_id,))
                         
-                    if expired_records:
+                    if expired_vaults:
                         conn.commit()
-                        print(f"[Daemon] ⚠️ Auto-Burned {len(expired_records)} expired 2GB payload(s) from SSD.")
+                        print(f"[Daemon] 🔥 Auto-Burned {len(expired_vaults)} expired vault(s).")
             except Exception as e:
                 print(f"[Daemon Error] {e}")
-            
-            time.sleep(self.cleanup_interval)
-
-    def store_metadata(self, record_id, file_path, data_type, lifespan_minutes=10):
-        expiry_time = time.time() + (lifespan_minutes * 60)
-        try:
-            with sqlite3.connect(self.db_file) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO vault_v3 (id, file_path, data_type, expiry_time) VALUES (?, ?, ?, ?)",
-                    (record_id, file_path, data_type, expiry_time)
-                )
-                conn.commit()
-            return True
-        except sqlite3.IntegrityError:
-            return False 
-
-    def retrieve_and_burn_metadata(self, record_id):
-        current_time = time.time()
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT file_path, data_type FROM vault_v3 WHERE id = ? AND expiry_time > ?",
-                (record_id, current_time)
-            )
-            result = cursor.fetchone()
-            
-            if result:
-                cursor.execute("DELETE FROM vault_v3 WHERE id = ?", (record_id,))
-                conn.commit()
-                return {"file_path": result[0], "data_type": result[1]}
-            return None
+            time.sleep(60)
 
 vault_manager = SecureVaultManager()
 
 # ==========================================
-# 3. SECURE API ENDPOINTS
+# 3. SECURE CHUNK API ENDPOINTS
 # ==========================================
 def require_api_key(func):
-    """Enforces authentication using constant-time comparison to prevent timing attacks."""
     def wrapper(*args, **kwargs):
         provided_key = request.headers.get("X-API-Key", "")
         if not hmac.compare_digest(provided_key, API_KEY):
@@ -175,115 +172,134 @@ def require_api_key(func):
     wrapper.__name__ = func.__name__
     return wrapper
 
-@app.route('/api/store', methods=['POST'])
+@app.route('/api/vault/init', methods=['POST'])
 @require_api_key
-def api_store():
-    """
-    High-Speed Upload Endpoint.
-    Accepts Multipart FormData instead of JSON to stream directly to disk without RAM bloat.
-    """
-    try:
-        # 1. AI Security Shield Check
-        ip_addr = request.remote_addr
-        content_length = request.content_length
-        if ai_shield.analyze_request(ip_addr, content_length):
-            return jsonify({"error": "Traffic anomaly detected. Request blocked to preserve network integrity."}), 429
+def init_vault():
+    """Step 1: Vault aur Secure Text initialize karna"""
+    data = request.json
+    vault_id = data.get('id')
+    text_cipher = data.get('text_ciphertext')
+    
+    expires_at = time.time() + (10 * 60) # 10 Mins expiry
+    
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO vaults (vault_id, created_at, expires_at) VALUES (?, ?, ?)", 
+                           (vault_id, time.time(), expires_at))
+            if text_cipher:
+                cursor.execute("INSERT INTO vault_texts (vault_id, ciphertext) VALUES (?, ?)", 
+                               (vault_id, text_cipher))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Vault ID collision."}), 409
+            
+    return jsonify({"message": "Vault initialized"}), 200
 
-        # 2. Extract Metadata
-        # We expect a multipart/form-data request here for large files.
-        # Fallback to JSON is possible but not recommended for 2GB files.
-        record_id = request.form.get("id") or request.json.get("id") if request.is_json else request.form.get("id")
-        data_type = request.form.get("data_type") or request.json.get("data_type") if request.is_json else request.form.get("data_type")
-        
-        if not record_id:
-            return jsonify({"error": "Missing record ID."}), 400
-
-        # Generate a secure, randomized filename for SSD storage
-        secure_name = secure_filename(f"{uuid.uuid4().hex}.enc")
-        file_path = os.path.join(VAULT_DIR, secure_name)
-
-        # 3. Direct-to-Disk Streaming (The key to 2GB upload speed)
-        if 'payload_file' in request.files:
-            file_obj = request.files['payload_file']
-            file_obj.save(file_path) # Streams directly to disk using Werkzeug
-        elif request.is_json and 'ciphertext' in request.json:
-            # Fallback for old frontend (Text data only, not recommended for 2GB)
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(request.json['ciphertext'])
-        else:
-             return jsonify({"error": "No payload_file or ciphertext provided."}), 400
-
-        # 4. Save metadata to SQLite
-        success = vault_manager.store_metadata(record_id, file_path, data_type)
-        
-        if success:
-            print(f"[API] 🔒 Secured 2GB-capable payload to disk. ID: {record_id[:8]}...")
-            return jsonify({"message": "Payload secured successfully."}), 201
-        else:
-            os.remove(file_path) # Cleanup if DB collision
-            return jsonify({"error": "This ID is currently in use."}), 409
-
-    except Exception as e:
-        print(f"[API Error] /api/store: {str(e)}")
-        return jsonify({"error": "Internal server error during upload."}), 500
-
-@app.route('/api/retrieve/<record_id>', methods=['GET'])
+@app.route('/api/vault/chunk', methods=['POST'])
 @require_api_key
-def api_retrieve(record_id):
-    """
-    High-Speed Download Endpoint.
-    Streams the file from disk directly to the client, then burns it.
-    """
-    try:
-        # Fetch metadata and delete DB record
-        payload = vault_manager.retrieve_and_burn_metadata(record_id)
+def upload_chunk():
+    """Step 2: Parallel chunks receive karna"""
+    vault_id = request.form.get('vault_id')
+    file_id = request.form.get('file_id')
+    chunk_index = int(request.form.get('chunk_index'))
+    total_chunks = int(request.form.get('total_chunks'))
+    
+    file_name = secure_filename(request.form.get('file_name', 'enc_file'))
+    mime_type = request.form.get('mime_type', 'application/octet-stream')
+    file_size = int(request.form.get('file_size', 0))
+    chunk_data = request.files['chunk']
+
+    # Agar pehla chunk hai toh DB me file register karein
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        final_path = os.path.join(VAULT_DIR, f"{file_id}.enc")
+        cursor.execute("""
+            INSERT OR IGNORE INTO vault_files 
+            (file_id, vault_id, file_name, mime_type, file_size, file_path, total_chunks) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (file_id, vault_id, file_name, mime_type, file_size, final_path, total_chunks))
+        conn.commit()
+    
+    # Save chunk temporary
+    chunk_path = os.path.join(TEMP_DIR, f"{vault_id}_{file_id}.part{chunk_index}")
+    chunk_data.save(chunk_path)
+    
+    # Update count and stitch if complete
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE vault_files SET uploaded_chunks = uploaded_chunks + 1 WHERE file_id = ?", (file_id,))
+        cursor.execute("SELECT uploaded_chunks, total_chunks, file_path FROM vault_files WHERE file_id = ?", (file_id,))
+        uploaded, total, fpath = cursor.fetchone()
         
-        if not payload or not os.path.exists(payload['file_path']):
-            return jsonify({"error": "Payload not found or already burned."}), 404
+        if uploaded == total:
+            # Pura file aa gaya, chunks ko merge karo
+            with open(fpath, 'wb') as outfile:
+                for i in range(total):
+                    cpath = os.path.join(TEMP_DIR, f"{vault_id}_{file_id}.part{i}")
+                    with open(cpath, 'rb') as infile:
+                        outfile.write(infile.read())
+                    os.remove(cpath)
+            
+            cursor.execute("UPDATE vault_files SET status = 'ready' WHERE file_id = ?", (file_id,))
+        conn.commit()
+            
+    return jsonify({"status": "Chunk received"}), 200
 
-        file_path = payload['file_path']
+@app.route('/api/vault/metadata/<vault_id>', methods=['GET'])
+@require_api_key
+def get_metadata(vault_id):
+    """Step 3: Download ke time files ki list aur text fetch karna"""
+    current_time = time.time()
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT expires_at FROM vaults WHERE vault_id = ? AND expires_at > ?", (vault_id, current_time))
+        if not cursor.fetchone():
+            return jsonify({"error": "Vault not found or expired"}), 404
+            
+        cursor.execute("SELECT ciphertext FROM vault_texts WHERE vault_id = ?", (vault_id,))
+        text_row = cursor.fetchone()
+        text_cipher = text_row[0] if text_row else None
+        
+        cursor.execute("SELECT file_id, file_name, mime_type, file_size FROM vault_files WHERE vault_id = ? AND status = 'ready'", (vault_id,))
+        files = [{"file_id": r[0], "file_name": r[1], "mime_type": r[2], "file_size": r[3]} for r in cursor.fetchall()]
+        
+    return jsonify({"text_ciphertext": text_cipher, "files": files}), 200
 
-        # Custom Generator to stream the file to the user AND delete it immediately after
-        def generate_and_burn():
-            try:
-                with open(file_path, 'rb') as f:
-                    while chunk := f.read(8192): # Stream in 8KB chunks
-                        yield chunk
-            finally:
-                # BURN IT immediately after streaming finishes
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"[API] 🔥 File {file_path} streamed and permanently burned.")
+@app.route('/api/vault/download/<file_id>', methods=['GET'])
+@require_api_key
+def download_file(file_id):
+    """Step 4: Real file ko memory stream karke client ko bhejna aur SSD se burn karna"""
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT file_path FROM vault_files WHERE file_id = ?", (file_id,))
+        row = cursor.fetchone()
+        
+    if not row or not os.path.exists(row[0]):
+        return jsonify({"error": "File burned or not found"}), 404
+        
+    file_path = row[0]
 
-        # If data type was JSON text from older frontend, read it normally
-        if payload['data_type'] in ['json_payload', 'json_payload_v2', 'text']:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            os.remove(file_path)
-            print(f"[API] 🔥 Text payload {record_id[:8]} burned.")
-            return jsonify({"ciphertext": content, "data_type": payload['data_type']}), 200
+    def generate_and_burn():
+        try:
+            with open(file_path, 'rb') as f:
+                while chunk := f.read(1024 * 1024): # 1MB stream chunks
+                    yield chunk
+        finally:
+            # File download hote hi permanent burn
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                with sqlite3.connect(DB_NAME) as conn:
+                    conn.execute("DELETE FROM vault_files WHERE file_id = ?", (file_id,))
+                print(f"[API] 🔥 File {file_path} burned after download.")
 
-        # For large binary files, stream the response to avoid RAM issues
-        return Response(generate_and_burn(), mimetype='application/octet-stream')
+    return Response(generate_and_burn(), mimetype='application/octet-stream')
 
-    except Exception as e:
-        print(f"[API Error] /api/retrieve: {str(e)}")
-        return jsonify({"error": "Internal server error during retrieval."}), 500
-
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    return jsonify({"error": "File exceeds the 2 GB hardware limit."}), 413
-
-# ==========================================
-# 4. SERVER STARTUP
-# ==========================================
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("🚀 SECRETBRIDGE BACKEND V3 (HIGH-SPEED) IS ONLINE")
-    print(f"🔒 API Key Auth: ENABLED (Constant-Time)")
-    print("🤖 AI Security Shield: ACTIVE (Isolation Forest DDoS Guard)")
-    print("💾 Storage Capacity: 2.0 GB per payload (Streaming Mode)")
+    print("🚀 SECRETBRIDGE BACKEND V4 (PRODUCTION CHUNKING) IS ONLINE")
+    print("🗄️ Database: SQLite (WAL Mode for high concurrency)")
+    print("⚡ Upload Strategy: Parallel Chunking")
     print("="*60 + "\n")
     
-    # Threaded=True allows multiple concurrent high-speed uploads
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
