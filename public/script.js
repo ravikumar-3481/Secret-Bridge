@@ -1,4 +1,4 @@
-       const API_URL = "http://localhost:5000/api";
+       const API_URL = "https://secret-bridge-2.onrender.com/api";
         const API_KEY = "super_secret_bridge_api_key_2024";
 
         let activeTab = 'home'; 
